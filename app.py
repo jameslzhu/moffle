@@ -29,6 +29,9 @@ from forms import AjaxSearchForm
 from forms import SearchForm
 
 
+#REMOVE
+import IPython
+
 if config.DEBUG_PYINSTRUMENT:
     from pyinstrument import Profiler
 
@@ -51,6 +54,7 @@ def network(network):
     except exceptions.NoResultsException:
         abort(404)
 
+    #IPython.embed()
     return render_template('network.html', network=network, channels=channels)
 
 

@@ -44,7 +44,6 @@ class LogPath:
 
     def networks(self):
         base_contents = os.listdir(config.LOG_BASE)
-        IPython.embed()
 
         dirs = [
             network for network in base_contents
@@ -407,3 +406,19 @@ class ZNC16DirectoryDelimitedLogPath(DirectoryDelimitedLogPath):
         log_file = enumerate(open(log_path, errors='ignore').readlines(), start=1)
 
         return LogResult(log_file, before, after)
+
+class ZNC16UserDirectoryDelimitedLogPath(ZNC16DirectoryDelimitedLogPath):
+    def networks(self):
+        base_contents = os.listdir(config.LOG_BASE + LOG_INTERMEDIATE_BASE)
+
+        dirs = [
+            network for network in base_contents
+            if os.path.isdir(
+                self.network_to_path(network)
+            ) and self.ac.evaluate(network, None)
+        ]
+        return sorted(dirs)
+
+    @fastcache.clru_cache(maxsize=128)
+    def network_to_path(self, network):
+        return os.path.join(config.LOG_BASE, LOG_INTERMEDIATE_BASE, network)

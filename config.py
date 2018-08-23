@@ -7,7 +7,7 @@ LOG_BASE = "/var/lib/znc/users/logger/"
 # If you have an abnormal ZNC logging setup, implement your own LogPath thingy
 # and set this to your implementation class name.
 # Most people will not worry about this.
-LOG_PATH_CLASS = "LogPath"
+LOG_PATH_CLASS = "ZNC16UserDirectoryDelimitedLogPath"
 
 # Whether or not Flask is behind a HTTP proxy.
 # Affects whether or not we insert proxy middleware.
