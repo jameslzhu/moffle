@@ -13,6 +13,7 @@ import fastcache
 
 import config
 import exceptions
+import IPython
 import looseboy
 import util
 
@@ -49,7 +50,7 @@ class LogPath:
                 self.network_to_path(network)
             ) and self.ac.evaluate(network, None)
         ]
-
+        IPython.embed()
         return sorted(dirs)
 
     def channels(self, network):
@@ -295,7 +296,7 @@ class DirectoryDelimitedLogPath(LogPath):
         return os.path.join(self.network_to_path(network), channel)
 
     # This lets us use LogPath.channels instead of reimplementing.
-    @cachetools.ttl_cache(maxsize=128, ttl=21600)
+    #@cachetools.ttl_cache(maxsize=128, ttl=21600)
     def _channels_list(self, network):
         network_base = self.network_to_path(network)
 
@@ -330,11 +331,13 @@ class ZNC16DirectoryDelimitedLogPath(DirectoryDelimitedLogPath):
     # Assume people are creating user-per-network. If they aren't they can subclass
     # something themselves. This assumption is embedded into LOG_FILENAME_REGEX
     # anyway.
-    NETWORK_DEFAULT_USER = "default"
+    NETWORK_DEFAULT_USER = "logger"
 
     @fastcache.clru_cache(maxsize=128)
     def network_to_path(self, network):
-        return os.path.join(config.LOG_BASE, network, LOG_INTERMEDIATE_BASE, ZNC16DirectoryDelimitedLogPath.NETWORK_DEFAULT_USER)
+        path = os.path.join(config.LOG_BASE, network, LOG_INTERMEDIATE_BASE, ZNC16DirectoryDelimitedLogPath.NETWORK_DEFAULT_USER)
+        print(path)
+        return path
 
     def _dates_list(self, network, channel):
         """ZNC 1.6 default stores files with a %Y-%m-%d format. Preserve the %Y%m%d format in display

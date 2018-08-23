@@ -34,6 +34,15 @@ start: css ensure-stopped
 		-H $(VENV) \
 		-w $(APP_MODULE)
 
+# run with IPython
+debug: css ensure-stopped
+	$(BIN) \
+		--honour-stdin \
+		--pidfile $(PIDFILE) \
+		--http-socket $(BIND) \
+		-H $(VENV) \
+		-w $(APP_MODULE)
+
 stop:
 	$(BIN) --stop $(PIDFILE)
 	while [ ! -z "`pgrep -F $(PIDFILE)`" ]; do sleep .1; done
