@@ -12,7 +12,6 @@ static/style.css
 *.stamp
 *.mo
 
-config.py
 Makefile.appconfig
 
 app.pid

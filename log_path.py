@@ -18,6 +18,7 @@ import looseboy
 import util
 
 LOG_INTERMEDIATE_BASE = "moddata/log"
+# lol not working rn
 LOG_FILENAME_REGEX = re.compile("(?P<filename>(?P<network>(default|znc)+)_(?P<channel>[#&]*[a-zA-Z0-9\u4e00-\u9fff/_\-\.\?\$]+)_(?P<date>\d{8})\.log)")
 
 LogResult = namedtuple('LogResult', ['log', 'before', 'after'])
@@ -43,6 +44,7 @@ class LogPath:
 
     def networks(self):
         base_contents = os.listdir(config.LOG_BASE)
+        IPython.embed()
 
         dirs = [
             network for network in base_contents
@@ -50,7 +52,6 @@ class LogPath:
                 self.network_to_path(network)
             ) and self.ac.evaluate(network, None)
         ]
-        IPython.embed()
         return sorted(dirs)
 
     def channels(self, network):
