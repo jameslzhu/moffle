@@ -12,11 +12,11 @@ Moffle, the Proceedings of the Internet Relay Chat Preservation Society
   4. If you so choose, now is the time to set up nginx config for reverse proxy.
   5. Do this:
 
-        bower install
-        make init-env
-        make css
-        make translations-compile
-        make
+        `bower install`
+        `make init-env`
+        `make css`
+        `make translations-compile`
+        `make`
 
   6. You should now be running a thing. Congratulations.
 
