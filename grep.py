@@ -20,6 +20,8 @@ import logging
 import re
 import signal
 
+import IPython
+
 import fastcache
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import MultiSearch
@@ -240,21 +242,28 @@ class ESGrepBuilder:
 
     def __init__(self, _):
         self.es = Elasticsearch(['localhost'])
+        self.index = config.SITE_NAME.lower()
 
     def _format_line(self, line, is_hit):
-        if line.line_type == 'normal':
-            text = '[{0.time}] <{0.author}> {0.text}'.format(line)
-        elif line.line_type == 'action':
-            text = '[{0.time}] * {0.author} {0.text}'.format(line)
+        #if line.line_type == 'normal':
+        #    text = '[{0.time}] <{0.author}> {0.text}'.format(line)
+        #elif line.line_type == 'action':
+        #    text = '[{0.time}] * {0.author} {0.text}'.format(line)
 
         # network??
         return Line(
             channel=line.channel,
             date=line.date,
             line_marker=':' if is_hit else '-',
-            line_no=line.line_no,
-            line=text,
+            line_no=1, # line.line_no,
+            #line=text,
+            line=line.message,
         )
+
+    def _normalize_channel(self, channel):
+        if not channel.startswith('#'):
+            return channel
+        return channel.lstrip('#')
 
     def max_segment(self, oldest):
         today = date.today()
@@ -274,19 +283,23 @@ class ESGrepBuilder:
     def run(self, network, channels, query, author=None, date_range=None):
         # We don't support non-ajax, so will always have date range
         assert date_range
+        assert type(channels) == list
+
+        # elastic doesn't like the '#' sign... remap in the future?
+        channels = [ self._normalize_channel(c) for c in channels ]
         date_begin, date_end = date_range
 
+        # todo: for access control we probably want to change
+        # from fuzzy search to match
         result = Search(
-            using=self.es, index='moffle',
+            using=self.es, index=self.index,
         ).query(
             "match", text=query,
         ).query(
             "range", date={
-                'gt': date_begin.strftime('%Y%m%d'),
-                'lte': date_end.strftime('%Y%m%d'),
+                'gte': date_begin.strftime('%Y-%m-%d'),
+                'lte': date_end.strftime('%Y-%m-%d'),
             },
-        ).filter(
-            "terms", line_type=['normal', 'action'],
         ).filter(
             "term", network=network,
         ).filter(
@@ -297,49 +310,46 @@ class ESGrepBuilder:
 
         hits = []
         # TODO: interval merging
-        ctx_search = MultiSearch(using=self.es, index='moffle')
+        ctx_search = MultiSearch(using=self.es, index=self.index)
         for hit in result:
             # Fetch context
             ctx_search = ctx_search.add(Search(
                 using=self.es,
-                index='moffle',
+                index=self.index,
             ).query(
-                "range", line_no={
-                    "gte": hit.line_no - config.SEARCH_CONTEXT,
-                    "lte": hit.line_no + config.SEARCH_CONTEXT,
-                },
+                "match", date=hit.date,
             ).filter(
                 "term", network=hit.network,
             ).filter(
-                "term", channel=hit.channel,
-            ).filter(
-                "term", date=hit.date,
+                "term", channel=self._normalize_channel(hit.channel),
             ).sort(
-                "line_no",
-            ))
-
+                "@timestamp"))
+            # TODO: limit context
         ctx_results = ctx_search.execute()
         for hit, ctx_result in zip(result, ctx_results):
             lines = []
             for ctx_hit in ctx_result:
                 lines.append(self._format_line(
                     ctx_hit,
-                    is_hit=(hit.line_no == ctx_hit.line_no),
+                    is_hit=(hit.time == ctx_hit.time),
                 ))
             hit = Hit(
                 channel=hit.channel,
                 date=hit.date,
-                begin=lines[0].line_no,
+                #begin=lines[0].line_no,
+                begin=1,
                 lines=lines,
             )
             hits.append(hit)
 
         hits = [list(group) for _, group in groupby(hits, key=lambda hit: hit.date)]
+        IPython.embed()
         return hits
 
 
 if __name__ == "__main__":
-    e = ESGrepBuilder()
+    e = ESGrepBuilder('anime')
+    dummy_range = [ date(2017, 1, 1), date(2018, 8, 24) ]
     print(
-        e.run('bitlbee', '#fanime', 'fanime')
+        e.run('ocf', ['#rebuild'], 'test', date_range=dummy_range)
     )
