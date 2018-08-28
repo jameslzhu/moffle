@@ -17,6 +17,7 @@ from statistics import mean
 from statistics import StatisticsError
 from subprocess import Popen
 from subprocess import PIPE
+import bisect
 import logging
 import re
 import signal
@@ -35,7 +36,21 @@ logger = logging.getLogger(__name__)
 
 Replacement = namedtuple('Replacement', ['name', 'required', 'regex'])
 Hit = namedtuple('Hit', ['channel', 'date', 'begin', 'lines'])
-Line = namedtuple('Line', ['channel', 'date', 'line_marker', 'line_no', 'line'])
+
+class Line:
+    def __init__(self, channel, date, timestamp, line_marker, line_no, line):
+        self.channel = channel
+        self.date = date
+        self.timestamp = timestamp
+        self.line_marker = line_marker
+        self.line_no = line_no
+        self.line = line
+
+    def _totimestamp(self):
+        return datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.000Z")
+
+    def __lt__(self, other):
+        self._totimestamp() < other._totimestamp()
 
 # TODO: Having to parse the filenames again should be part of log_path's
 # responsibility
@@ -256,6 +271,7 @@ class ESGrepBuilder:
         return Line(
             channel=line.channel,
             date=line.date,
+            timestamp=line.to_dict()['@timestamp'],
             line_marker=':' if is_hit else '-',
             line_no=1, # line.line_no,
             #line=text,
@@ -318,16 +334,13 @@ class ESGrepBuilder:
         ctx_search = MultiSearch(using=self.es, index=self.index)
         for hit in result:
             # Fetch context
-            # Shitty hack to ensure the hit is fetched with the context.
-            # 1 minute seems to gurantee it... 5 minutes does not, even
-            # though filters shouldn't score.
             ctx_search = ctx_search.add(Search(
                 using=self.es,
                 index=self.index,
             ).filter(
                 "range", **{'@timestamp':{
-                    'gt': hit.to_dict()['@timestamp'] + '||' + '-1m',
-                    'lte': hit.to_dict()['@timestamp'] + '||' + '+1m',
+                    'gt': hit.to_dict()['@timestamp'] + '||' + '-15m',
+                    'lte': hit.to_dict()['@timestamp'] + '||' + '+15m',
                 }}
             ).filter(
                 "term", network=hit.network,
@@ -338,17 +351,29 @@ class ESGrepBuilder:
         ctx_results = ctx_search.execute()
         for hit, ctx_result in zip(result, ctx_results):
             lines = []
+            bad_ctx = True
             for ctx_hit in ctx_result:
+                is_hit=(hit.meta.id == ctx_hit.meta.id)
+                if is_hit:
+                    bad_ctx = False
                 lines.append(self._format_line(
                     ctx_hit,
-                    is_hit=(hit.meta.id == ctx_hit.meta.id),
+                    is_hit=is_hit,
                 ))
+            # Elastic sometimes doesn't return our hit in the context.
+            # Let's manually insert it. Yes, this is garbage, but isn't
+            # horribly expensive since the elastic already sorts the list.
+            if bad_ctx:
+                bisect.insort(
+                    lines,
+                    self._format_line(hit, True))
             hit = Hit(
                 channel=hit.channel,
                 date=hit.date,
                 begin=1,
                 lines=lines,
             )
+
             hits.append(hit)
         hits = [list(group) for _, group in groupby(hits, key=lambda hit: hit.date)]
         return hits
@@ -357,4 +382,4 @@ class ESGrepBuilder:
 if __name__ == "__main__":
     e = ESGrepBuilder('anime')
     dummy_range = [ date(2017, 1, 1), date(2018, 8, 24) ]
-    e.run('ocf', ['#rebuild'], 'anotehuaonetuh', date_range=dummy_range)
+    e.run('ocf', ['#rebuild'], 'test', date_range=dummy_range)

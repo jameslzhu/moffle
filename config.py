@@ -24,7 +24,7 @@ GOOGLE_OAUTH_CONSUMER_SECRET = ""
 SEARCH_WORKERS = 8
 
 # Number of logs (in hours) for search context
-SEARCH_CONTEXT = 10
+SEARCH_CONTEXT = 5
 
 # The number of weeks to segment AJAX searches into.
 SEARCH_CHUNK_INTERVAL_WEEKS = 4
