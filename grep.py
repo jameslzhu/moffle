@@ -309,6 +309,10 @@ class ESGrepBuilder:
         ).sort(
             "-date",
         )[:10000].execute()
+
+        if not result:
+            return []
+
         hits = []
         # TODO: interval merging
         ctx_search = MultiSearch(using=self.es, index=self.index)
@@ -342,7 +346,6 @@ class ESGrepBuilder:
             hit = Hit(
                 channel=hit.channel,
                 date=hit.date,
-                #begin=lines[0].line_no,
                 begin=1,
                 lines=lines,
             )
