@@ -54,7 +54,6 @@ def network(network):
     except exceptions.NoResultsException:
         abort(404)
 
-    #IPython.embed()
     return render_template('network.html', network=network, channels=channels)
 
 
@@ -186,7 +185,7 @@ def search_ajax_chunk():
             query=form.text.data,
             date_range=[date_start, date_end],
         )
-
+    #IPython.embed()
     return render_template('search_result.html', network=form.network.data, channels=[form.channel.data], results=results)
 
 

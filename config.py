@@ -23,7 +23,7 @@ GOOGLE_OAUTH_CONSUMER_SECRET = ""
 # Number of search worker processes.
 SEARCH_WORKERS = 8
 
-# Number of context lines around each search result.
+# Number of logs (in hours) for search context
 SEARCH_CONTEXT = 10
 
 # The number of weeks to segment AJAX searches into.

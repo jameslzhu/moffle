@@ -3,6 +3,7 @@
 from collections import namedtuple
 from datetime import date
 from datetime import timedelta
+from datetime import datetime
 from functools import partial
 from html import unescape
 from itertools import islice
@@ -243,6 +244,7 @@ class ESGrepBuilder:
     def __init__(self, _):
         self.es = Elasticsearch(['localhost'])
         self.index = config.SITE_NAME.lower()
+        self.delta = timedelta(hours=config.SEARCH_CONTEXT)
 
     def _format_line(self, line, is_hit):
         #if line.line_type == 'normal':
@@ -297,7 +299,7 @@ class ESGrepBuilder:
             "match", text=query,
         ).query(
             "range", date={
-                'gte': date_begin.strftime('%Y-%m-%d'),
+                'gt': date_begin.strftime('%Y-%m-%d'),
                 'lte': date_end.strftime('%Y-%m-%d'),
             },
         ).filter(
@@ -307,31 +309,35 @@ class ESGrepBuilder:
         ).sort(
             "-date",
         )[:10000].execute()
-
         hits = []
         # TODO: interval merging
         ctx_search = MultiSearch(using=self.es, index=self.index)
         for hit in result:
             # Fetch context
+            # Shitty hack to ensure the hit is fetched with the context.
+            # 1 minute seems to gurantee it... 5 minutes does not, even
+            # though filters shouldn't score.
             ctx_search = ctx_search.add(Search(
                 using=self.es,
                 index=self.index,
-            ).query(
-                "match", date=hit.date,
+            ).filter(
+                "range", **{'@timestamp':{
+                    'gt': hit.to_dict()['@timestamp'] + '||' + '-1m',
+                    'lte': hit.to_dict()['@timestamp'] + '||' + '+1m',
+                }}
             ).filter(
                 "term", network=hit.network,
             ).filter(
                 "term", channel=self._normalize_channel(hit.channel),
             ).sort(
-                "@timestamp"))
-            # TODO: limit context
+                "@timestamp")[:config.SEARCH_CONTEXT])
         ctx_results = ctx_search.execute()
         for hit, ctx_result in zip(result, ctx_results):
             lines = []
             for ctx_hit in ctx_result:
                 lines.append(self._format_line(
                     ctx_hit,
-                    is_hit=(hit.time == ctx_hit.time),
+                    is_hit=(hit.meta.id == ctx_hit.meta.id),
                 ))
             hit = Hit(
                 channel=hit.channel,
@@ -341,15 +347,11 @@ class ESGrepBuilder:
                 lines=lines,
             )
             hits.append(hit)
-
         hits = [list(group) for _, group in groupby(hits, key=lambda hit: hit.date)]
-        IPython.embed()
         return hits
 
 
 if __name__ == "__main__":
     e = ESGrepBuilder('anime')
     dummy_range = [ date(2017, 1, 1), date(2018, 8, 24) ]
-    print(
-        e.run('ocf', ['#rebuild'], 'test', date_range=dummy_range)
-    )
+    e.run('ocf', ['#rebuild'], 'anotehuaonetuh', date_range=dummy_range)
