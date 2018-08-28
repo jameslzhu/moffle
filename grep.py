@@ -38,13 +38,17 @@ Replacement = namedtuple('Replacement', ['name', 'required', 'regex'])
 Hit = namedtuple('Hit', ['channel', 'date', 'begin', 'lines'])
 
 class Line:
-    def __init__(self, channel, date, timestamp, line_marker, line_no, line):
+    def __init__(self, channel, date, line_marker, line_no, line):
         self.channel = channel
         self.date = date
-        self.timestamp = timestamp
         self.line_marker = line_marker
         self.line_no = line_no
         self.line = line
+
+class ESLine(Line):
+    def __init__(self, channel, date, line_marker, line_no, line, timestamp):
+        self.timestamp = timestamp
+        super().__init__(channel, date, line_marker, line_no, line)
 
     def _totimestamp(self):
         return datetime.strptime(self.timestamp, "%Y-%m-%dT%H:%M:%S.000Z")
@@ -262,20 +266,13 @@ class ESGrepBuilder:
         self.delta = timedelta(hours=config.SEARCH_CONTEXT)
 
     def _format_line(self, line, is_hit):
-        #if line.line_type == 'normal':
-        #    text = '[{0.time}] <{0.author}> {0.text}'.format(line)
-        #elif line.line_type == 'action':
-        #    text = '[{0.time}] * {0.author} {0.text}'.format(line)
-
-        # network??
-        return Line(
+        return ESLine(
             channel=line.channel,
             date=line.date,
-            timestamp=line.to_dict()['@timestamp'],
             line_marker=':' if is_hit else '-',
             line_no=1, # line.line_no,
-            #line=text,
             line=line.message,
+            timestamp=line.to_dict()['@timestamp'],
         )
 
     def _normalize_channel(self, channel):
