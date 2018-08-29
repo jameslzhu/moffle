@@ -321,6 +321,7 @@ class ESGrepBuilder:
             "terms", channel=channels,
         ).sort(
             "-date",
+            "@timestamp",
         )[:10000].execute()
 
         if not result:
