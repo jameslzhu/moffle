@@ -5,28 +5,29 @@ from flask import redirect
 from flask import request
 from flask import session
 from flask import url_for
-from flask_oauthlib.client import OAuth
+#from flask_oauthlib.client import OAuth
+from authlib.flask.client import OAuth
 
 import config
 
 auth = Blueprint('auth', __name__, template_folder='templates')
 oauth = OAuth()
-google = oauth.remote_app(
-    'google',
-    app_key='GOOGLE',
+google = oauth.register(
+    name='GOOGLE',
+    client_id=config.GOOGLE_OAUTH_CONSUMER_KEY,
+    client_secret=config.GOOGLE_OAUTH_CONSUMER_SECRET,
+    request_token_url=None,  # OAuth 2
     request_token_params={
         'scope': 'https://www.googleapis.com/auth/userinfo.email'
     },
-    base_url='https://www.googleapis.com/oauth2/v1/',
-    request_token_url=None,
-    access_token_method='POST',
     access_token_url='https://accounts.google.com/o/oauth2/token',
     authorize_url='https://accounts.google.com/o/oauth2/auth',
-    consumer_key=config.GOOGLE_OAUTH_CONSUMER_KEY,
-    consumer_secret=config.GOOGLE_OAUTH_CONSUMER_SECRET,
+    api_base_url='https://www.googleapis.com/oauth2/v1/',
+    
+    # authlib fn registry
+    fetch_token=get_google_oauth_token,
 )
 
-@google.tokengetter
 def get_google_oauth_token():
     return session.get('google_token')
 
@@ -53,8 +54,8 @@ def login():
             path=path,
         )
         session['next_url'] = next_url
-    return google.authorize(
-        callback=url_for('.authorized', _external=True))
+    redirect_uri = url_for('.authorized', _external=True)
+    return google.authorize_redirect(redirect_uri)
 
 
 @auth.route('/logout')
@@ -66,7 +67,7 @@ def logout():
 
 @auth.route('/login/authorized')
 def authorized():
-    resp = google.authorized_response()
+    token = google.authorize_access_token()
     next_url = session.pop('next_url', url_for('index'))
 
     if resp is None:
@@ -74,6 +75,6 @@ def authorized():
         return redirect(next_url)
 
     session.permanent = True
-    session['google_token'] = (resp['access_token'], '')
+    session['google_token'] = (token, '')
     session['user'] = google.get('userinfo').data
     return redirect(next_url)
